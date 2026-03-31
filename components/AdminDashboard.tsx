@@ -1,201 +1,270 @@
 import React, { useState } from 'react';
-import { Project, Booking } from '../types';
-import { Trash2, Plus, Check, X, Calendar, Image as ImageIcon } from 'lucide-react';
+import { Design, PortfolioItem, Appointment, User } from '../types';
+import { BookingController, ContentController, AuthService } from '../services/api';
+import { Trash2, Plus, Check, X, LogIn, Lock, Grid, Image as ImageIcon, Calendar } from 'lucide-react';
 
 interface AdminDashboardProps {
-  projects: Project[];
-  bookings: Booking[];
-  setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
-  setBookings: React.Dispatch<React.SetStateAction<Booking[]>>;
+  user: User | null;
+  onLogin: (user: User) => void;
+  // Data passed from parent to keep sync, or fetched inside
+  bookings: Appointment[];
+  designs: Design[];
+  portfolio: PortfolioItem[];
+  refreshData: () => void;
 }
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ projects, bookings, setProjects, setBookings }) => {
-  const [activeTab, setActiveTab] = useState<'bookings' | 'content'>('bookings');
-  const [newProject, setNewProject] = useState({
-    title: '',
-    imageUrl: '',
-    category: 'portfolio',
-    description: '',
-    price: ''
-  });
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogin, bookings, designs, portfolio, refreshData }) => {
+  const [activeTab, setActiveTab] = useState<'bookings' | 'flash' | 'portfolio'>('bookings');
+  const [loginPass, setLoginPass] = useState('');
+  const [loginError, setLoginError] = useState(false);
 
-  const handleBookingStatus = (id: string, status: 'confirmed' | 'rejected') => {
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status } : b));
-  };
+  // CMS States
+  const [newDesign, setNewDesign] = useState<Partial<Design>>({ available: true });
+  const [newPortfolio, setNewPortfolio] = useState<Partial<PortfolioItem>>({});
 
-  const handleDeleteProject = (id: string) => {
-    setProjects(prev => prev.filter(p => p.id !== id));
-  };
-
-  const handleAddProject = (e: React.FormEvent) => {
+  // --- HANDLERS ---
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const project: Project = {
-      id: Date.now().toString(),
-      title: newProject.title,
-      imageUrl: newProject.imageUrl || `https://picsum.photos/seed/${Date.now()}/400/400`,
-      category: newProject.category as 'portfolio' | 'flash',
-      description: newProject.description,
-      price: newProject.price ? Number(newProject.price) : undefined
-    };
-    setProjects(prev => [project, ...prev]);
-    setNewProject({ title: '', imageUrl: '', category: 'portfolio', description: '', price: '' });
+    const user = await AuthService.login(loginPass);
+    if (user) {
+      onLogin(user);
+      setLoginError(false);
+    } else {
+      setLoginError(true);
+    }
   };
 
+  const handleStatusUpdate = async (id: string, status: Appointment['status']) => {
+    await BookingController.updateStatus(id, status);
+    refreshData();
+  };
+
+  const handleAddDesign = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDesign.title || !newDesign.imageUrl || !newDesign.price) return;
+    await ContentController.addDesign(newDesign as Design);
+    setNewDesign({ available: true, title: '', imageUrl: '', price: 0, style: '', size: '' });
+    refreshData();
+  };
+
+  const handleDeleteDesign = async (id: string) => {
+    if (window.confirm('¿Eliminar diseño?')) {
+      await ContentController.deleteDesign(id);
+      refreshData();
+    }
+  };
+
+  const handleAddPortfolio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPortfolio.title || !newPortfolio.imageUrl) return;
+    await ContentController.addPortfolioItem({
+      ...newPortfolio,
+      date: new Date().toISOString(),
+      tags: []
+    } as PortfolioItem);
+    setNewPortfolio({ title: '', imageUrl: '', description: '' });
+    refreshData();
+  };
+
+  const handleDeletePortfolio = async (id: string) => {
+     if (window.confirm('¿Eliminar trabajo?')) {
+      await ContentController.deletePortfolioItem(id);
+      refreshData();
+    }
+  };
+
+  // --- LOGIN VIEW ---
+  if (!user) {
+    return (
+      <div className="min-h-screen pt-32 pb-12 px-4 flex items-center justify-center bg-transparent">
+        <div className="bg-white border-4 border-black p-8 max-w-sm w-full shadow-hard">
+          <div className="flex justify-center mb-6">
+            <div className="bg-black text-white p-3">
+              <Lock size={32} />
+            </div>
+          </div>
+          <h2 className="text-3xl font-display font-bold text-center uppercase mb-6">Acceso Privado</h2>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input
+              type="password"
+              placeholder="Contraseña Maestra"
+              value={loginPass}
+              onChange={(e) => setLoginPass(e.target.value)}
+              className="w-full border-4 border-black p-3 font-serif outline-none focus:bg-gray-50 text-center tracking-widest"
+            />
+            {loginError && <p className="text-red-600 font-bold text-center text-xs uppercase">Acceso Denegado</p>}
+            <button type="submit" className="w-full bg-black text-white font-display font-bold uppercase py-3 border-4 border-black hover:bg-white hover:text-black transition-colors">
+              Entrar
+            </button>
+          </form>
+          <div className="mt-6 text-center">
+             <p className="text-xs text-gray-400 font-mono">INK.SAI SYSTEM v1.0</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- DASHBOARD VIEW ---
   return (
-    <div className="min-h-screen pt-32 pb-12 px-4 sm:px-6 lg:px-8 bg-gray-50">
+    <div className="min-h-screen pt-32 pb-12 px-4 sm:px-6 lg:px-8 bg-gray-50/50">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-10 pb-4 border-b border-gray-200">
-          <h2 className="text-2xl font-serif font-bold text-black uppercase tracking-wider">Dashboard</h2>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setActiveTab('bookings')}
-              className={`px-6 py-2 text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'bookings' ? 'bg-black text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-black'}`}
-            >
-              Citas
-            </button>
-            <button
-              onClick={() => setActiveTab('content')}
-              className={`px-6 py-2 text-sm font-bold uppercase tracking-wider transition-all ${activeTab === 'content' ? 'bg-black text-white' : 'bg-white text-gray-500 border border-gray-200 hover:border-black'}`}
-            >
-              Contenido
-            </button>
+        
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-10 pb-4 border-b-4 border-black gap-4">
+          <h2 className="text-4xl font-display font-bold text-black uppercase tracking-tighter">
+            PANEL DE CONTROL
+          </h2>
+          <div className="flex gap-2">
+            {[
+              { id: 'bookings', label: 'Citas', icon: Calendar },
+              { id: 'flash', label: 'Catálogo Flash', icon: Grid },
+              { id: 'portfolio', label: 'Portafolio', icon: ImageIcon },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-2 font-bold uppercase text-sm border-2 ${
+                  activeTab === tab.id ? 'bg-black text-white border-black' : 'bg-white text-gray-500 border-transparent hover:border-black'
+                }`}
+              >
+                <tab.icon size={16} />
+                <span className="hidden md:inline">{tab.label}</span>
+              </button>
+            ))}
           </div>
         </div>
 
-        {activeTab === 'bookings' ? (
-          <div className="bg-white border border-gray-200 rounded-sm shadow-sm">
-             {bookings.length === 0 && <p className="text-gray-400 text-center py-12 font-light">No hay solicitudes pendientes.</p>}
-             <div className="divide-y divide-gray-100">
+        {/* --- BOOKINGS TAB --- */}
+        {activeTab === 'bookings' && (
+          <div className="bg-white border-4 border-black shadow-sm">
+             {bookings.length === 0 && <p className="text-center py-12 text-gray-400 font-display uppercase">Sin Citas Pendientes</p>}
+             <div className="divide-y-2 divide-gray-100">
               {bookings.map(booking => (
-                <div key={booking.id} className="p-6 flex flex-col md:flex-row justify-between gap-6 hover:bg-gray-50 transition-colors">
+                <div key={booking.id} className="p-6 flex flex-col md:flex-row justify-between gap-6 hover:bg-gray-50">
                   <div className="flex-1">
                     <div className="flex items-center gap-4 mb-2">
-                      <h3 className="text-lg font-bold text-black">{booking.clientName}</h3>
-                      <span className={`px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider border ${
-                        booking.status === 'pending' ? 'border-yellow-500 text-yellow-600' :
-                        booking.status === 'confirmed' ? 'border-green-500 text-green-600' :
-                        'border-red-500 text-red-600'
+                      <h3 className="text-xl font-display font-bold text-black uppercase">{booking.clientName}</h3>
+                      <span className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider text-white ${
+                        booking.status === 'pending' ? 'bg-yellow-500' :
+                        booking.status === 'confirmed' ? 'bg-green-600' :
+                        'bg-red-600'
                       }`}>
                         {booking.status}
                       </span>
                     </div>
-                    <p className="text-gray-500 text-sm mb-1">{booking.clientEmail} • {booking.date}</p>
+                    <div className="font-serif text-sm text-gray-600 space-y-1 mb-4">
+                        <p>📅 {booking.date}</p>
+                        <p>📧 {booking.clientEmail}</p>
+                    </div>
                     
-                    <div className="mt-3 p-4 bg-gray-50 border-l-2 border-black">
-                      <p className="text-gray-800 text-sm font-serif">"{booking.idea}"</p>
+                    <div className="p-4 bg-gray-100 border-l-4 border-black">
+                      <p className="text-black font-bold text-sm uppercase mb-1">Proyecto:</p>
+                      <p className="text-gray-800 font-serif italic">"{booking.idea}"</p>
                       {booking.aiRefinedIdea && (
-                         <div className="mt-2 pt-2 border-t border-gray-200">
-                           <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">IA Refinada</p>
-                           <p className="text-xs text-gray-600 italic">{booking.aiRefinedIdea}</p>
+                         <div className="mt-2 pt-2 border-t border-gray-300">
+                           <p className="text-[10px] text-gray-500 uppercase tracking-wider">IA Refinada</p>
+                           <p className="text-xs text-gray-600">{booking.aiRefinedIdea}</p>
                          </div>
                       )}
                     </div>
                   </div>
 
-                  {booking.status === 'pending' && (
-                    <div className="flex items-start gap-2">
-                      <button 
-                        onClick={() => handleBookingStatus(booking.id, 'confirmed')}
-                        className="bg-black hover:bg-gray-800 text-white p-2 rounded-sm transition-colors"
-                        title="Aceptar"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button 
-                         onClick={() => handleBookingStatus(booking.id, 'rejected')}
-                        className="border border-gray-300 text-gray-400 hover:text-red-500 hover:border-red-500 p-2 rounded-sm transition-colors"
-                        title="Rechazar"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="bg-white p-8 border border-gray-200 h-fit lg:sticky lg:top-24">
-              <h3 className="text-lg font-bold text-black mb-6 uppercase tracking-wider flex items-center gap-2">
-                <Plus size={18} /> Nuevo Proyecto
-              </h3>
-              <form onSubmit={handleAddProject} className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Título del proyecto"
-                  required
-                  value={newProject.title}
-                  onChange={e => setNewProject({...newProject, title: e.target.value})}
-                  className="w-full bg-white border-b border-gray-300 p-2 text-black focus:border-black outline-none placeholder-gray-400"
-                />
-                <input
-                  type="url"
-                  placeholder="URL de la imagen"
-                  value={newProject.imageUrl}
-                  onChange={e => setNewProject({...newProject, imageUrl: e.target.value})}
-                  className="w-full bg-white border-b border-gray-300 p-2 text-black focus:border-black outline-none placeholder-gray-400"
-                />
-                <select
-                  value={newProject.category}
-                  onChange={e => setNewProject({...newProject, category: e.target.value})}
-                  className="w-full bg-white border-b border-gray-300 p-2 text-black focus:border-black outline-none"
-                >
-                  <option value="portfolio">Portafolio</option>
-                  <option value="flash">Flash</option>
-                </select>
-                
-                {newProject.category === 'flash' && (
-                  <input
-                    type="number"
-                    placeholder="Precio"
-                    value={newProject.price}
-                    onChange={e => setNewProject({...newProject, price: e.target.value})}
-                    className="w-full bg-white border-b border-gray-300 p-2 text-black focus:border-black outline-none placeholder-gray-400"
-                  />
-                )}
-                
-                <textarea
-                  placeholder="Descripción breve"
-                  rows={3}
-                  value={newProject.description}
-                  onChange={e => setNewProject({...newProject, description: e.target.value})}
-                  className="w-full bg-white border border-gray-200 p-3 text-black focus:border-black outline-none placeholder-gray-400 mt-2 resize-none"
-                />
-                
-                <button type="submit" className="w-full bg-black text-white font-bold py-3 uppercase tracking-widest hover:bg-gray-800 transition-colors text-sm mt-4">
-                  Publicar
-                </button>
-              </form>
-            </div>
-
-            <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {projects.map(project => (
-                <div key={project.id} className="group bg-white border border-gray-200 flex flex-col">
-                  <div className="relative h-64 overflow-hidden">
-                    <img src={project.imageUrl} alt={project.title} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
-                    <span className="absolute top-2 right-2 bg-white text-black text-[10px] font-bold px-2 py-1 uppercase tracking-wider border border-black">
-                      {project.category}
-                    </span>
+                  {/* Actions */}
+                  <div className="flex md:flex-col gap-2 justify-start">
+                    {booking.status === 'pending' && (
+                      <>
+                        <button onClick={() => handleStatusUpdate(booking.id, 'confirmed')} className="bg-black text-white p-3 hover:bg-gray-800" title="Confirmar">
+                            <Check size={20} />
+                        </button>
+                        <button onClick={() => handleStatusUpdate(booking.id, 'rejected')} className="bg-white border-2 border-black text-black p-3 hover:bg-red-50" title="Rechazar">
+                            <X size={20} />
+                        </button>
+                      </>
+                    )}
+                    <button className="text-gray-400 hover:text-red-600 p-3" title="Eliminar Registro">
+                        <Trash2 size={20} />
+                    </button>
                   </div>
-                  <div className="p-5 flex-1">
-                    <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-bold text-black uppercase tracking-wide">{project.title}</h4>
-                        {project.price && <p className="text-black font-bold">${project.price}</p>}
-                    </div>
-                    <p className="text-gray-500 text-xs">{project.description}</p>
-                  </div>
-                  <button 
-                    onClick={() => handleDeleteProject(project.id)}
-                    className="w-full border-t border-gray-100 text-gray-400 hover:text-red-600 hover:bg-red-50 py-3 transition-colors text-xs uppercase font-bold flex items-center justify-center gap-2"
-                  >
-                    <Trash2 size={14} /> Eliminar
-                  </button>
                 </div>
               ))}
             </div>
           </div>
         )}
+
+        {/* --- FLASH TAB --- */}
+        {activeTab === 'flash' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             {/* Upload Form */}
+            <div className="bg-white p-6 border-4 border-black h-fit">
+              <h3 className="text-xl font-display font-bold uppercase mb-4 flex items-center gap-2">
+                <Plus size={20} /> Nuevo Flash
+              </h3>
+              <form onSubmit={handleAddDesign} className="space-y-4">
+                <input type="text" placeholder="Título" required value={newDesign.title || ''} onChange={e => setNewDesign({...newDesign, title: e.target.value})} className="w-full border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                <input type="url" placeholder="URL Imagen" required value={newDesign.imageUrl || ''} onChange={e => setNewDesign({...newDesign, imageUrl: e.target.value})} className="w-full border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                <div className="flex gap-2">
+                    <input type="number" placeholder="Precio ($)" required value={newDesign.price || ''} onChange={e => setNewDesign({...newDesign, price: Number(e.target.value)})} className="w-1/2 border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                    <input type="text" placeholder="Tamaño" value={newDesign.size || ''} onChange={e => setNewDesign({...newDesign, size: e.target.value})} className="w-1/2 border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                </div>
+                <input type="text" placeholder="Estilo (Ej. Blackwork)" value={newDesign.style || ''} onChange={e => setNewDesign({...newDesign, style: e.target.value})} className="w-full border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                
+                <button type="submit" className="w-full bg-black text-white font-bold py-3 uppercase hover:bg-gray-800 mt-4">Publicar Diseño</button>
+              </form>
+            </div>
+
+            {/* Grid */}
+            <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+               {designs.map(design => (
+                 <div key={design.id} className="relative group border-2 border-black bg-white p-2">
+                    <img src={design.imageUrl} className="w-full aspect-[3/4] object-cover grayscale" />
+                    <div className="mt-2">
+                        <p className="font-display font-bold text-sm uppercase truncate">{design.title}</p>
+                        <p className="text-xs font-mono">${design.price}</p>
+                    </div>
+                    <button onClick={() => handleDeleteDesign(design.id)} className="absolute top-2 right-2 bg-red-600 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 size={14} />
+                    </button>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
+        {/* --- PORTFOLIO TAB --- */}
+        {activeTab === 'portfolio' && (
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+             {/* Upload Form */}
+            <div className="bg-white p-6 border-4 border-black h-fit">
+              <h3 className="text-xl font-display font-bold uppercase mb-4 flex items-center gap-2">
+                <Plus size={20} /> Nuevo Trabajo
+              </h3>
+              <form onSubmit={handleAddPortfolio} className="space-y-4">
+                <input type="text" placeholder="Título" required value={newPortfolio.title || ''} onChange={e => setNewPortfolio({...newPortfolio, title: e.target.value})} className="w-full border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                <input type="url" placeholder="URL Imagen" required value={newPortfolio.imageUrl || ''} onChange={e => setNewPortfolio({...newPortfolio, imageUrl: e.target.value})} className="w-full border-b-2 border-gray-300 p-2 outline-none focus:border-black font-serif"/>
+                <textarea placeholder="Descripción del trabajo" rows={3} value={newPortfolio.description || ''} onChange={e => setNewPortfolio({...newPortfolio, description: e.target.value})} className="w-full border-2 border-gray-200 p-2 outline-none focus:border-black font-serif resize-none"/>
+                
+                <button type="submit" className="w-full bg-black text-white font-bold py-3 uppercase hover:bg-gray-800 mt-4">Subir Foto</button>
+              </form>
+            </div>
+
+            {/* Grid */}
+            <div className="lg:col-span-2 grid grid-cols-2 sm:grid-cols-3 gap-4">
+               {portfolio.map(item => (
+                 <div key={item.id} className="relative group border-2 border-black bg-white p-2">
+                    <img src={item.imageUrl} className="w-full aspect-square object-cover grayscale" />
+                    <div className="mt-2">
+                        <p className="font-display font-bold text-sm uppercase truncate">{item.title}</p>
+                    </div>
+                    <button onClick={() => handleDeletePortfolio(item.id)} className="absolute top-2 right-2 bg-red-600 text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Trash2 size={14} />
+                    </button>
+                 </div>
+               ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
