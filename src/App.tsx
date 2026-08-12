@@ -1,29 +1,24 @@
-import { useState } from 'react';
-import type { Piece } from './types';
-import Intro from './components/Intro';
+import { Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
-import Hero from './components/Hero';
-import TattooGallery from './components/TattooGallery';
-import CanvasGrid from './components/CanvasGrid';
-import Artist from './components/Artist';
-import Contact from './components/Contact';
-import Lightbox from './components/Lightbox';
+import Home from './pages/Home';
+import Agendar from './pages/Agendar';
+import MisReservas from './pages/MisReservas';
+import Admin from './pages/Admin';
+import Login from './pages/Login';
+import NotFound from './pages/NotFound';
 
 function App() {
-  const [selected, setSelected] = useState<Piece | null>(null);
-
   return (
     <div className="min-h-screen bg-paper text-ink selection:bg-ink selection:text-paper overflow-x-hidden">
-      <Intro />
       <Header />
-      <main>
-        <Hero />
-        <TattooGallery onSelect={setSelected} />
-        <CanvasGrid onSelect={setSelected} />
-        <Artist />
-        <Contact />
-      </main>
-      {selected && <Lightbox piece={selected} onClose={() => setSelected(null)} />}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/agendar" element={<Agendar />} />
+        <Route path="/mis-reservas" element={<MisReservas />} />
+        <Route path="/admin" element={<Admin />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </div>
   );
 }
