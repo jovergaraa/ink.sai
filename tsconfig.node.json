@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "strict": true,
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": "node_modules/.tsbuild",
+    "types": ["node"]
+  },
+  "include": ["prisma.config.ts", "vite.config.ts"]
+}
