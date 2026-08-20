@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import AuthModal from './AuthModal';
 
 const SECTION_LINKS = [
   { href: '/#tatuajes', label: 'Tatuajes' },
@@ -10,10 +12,11 @@ const SECTION_LINKS = [
 const APP_LINKS = [
   { to: '/agendar', label: 'Agendar' },
   { to: '/mis-reservas', label: 'Mis reservas' },
-  { to: '/login', label: 'Ingresar' },
 ];
 
 export default function Header() {
+  const [authOpen, setAuthOpen] = useState(false);
+
   return (
     <header className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-between px-10 py-5 mix-blend-difference">
       <Link to="/" className="font-serif italic text-[19px] tracking-wide text-paper">
@@ -30,7 +33,12 @@ export default function Header() {
             {l.label}
           </Link>
         ))}
+        <button onClick={() => setAuthOpen(true)} className="font-mono uppercase tracking-[0.26em]">
+          Ingresar
+        </button>
       </nav>
+
+      {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
     </header>
   );
 }
