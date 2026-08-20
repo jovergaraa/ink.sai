@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
+import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import Agendar from './pages/Agendar';
 import MisReservas from './pages/MisReservas';
@@ -14,8 +15,22 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/agendar" element={<Agendar />} />
-        <Route path="/mis-reservas" element={<MisReservas />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route
+          path="/mis-reservas"
+          element={
+            <ProtectedRoute>
+              <MisReservas />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute requireRol="admin">
+              <Admin />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
