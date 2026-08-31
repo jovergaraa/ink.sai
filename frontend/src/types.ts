@@ -2,6 +2,7 @@ export interface Piece {
   n: string;
   title: string;
   year: string;
+  image?: string;
 }
 
 export type ViewState = 'home';
