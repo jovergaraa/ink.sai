@@ -1,3 +1,5 @@
+import simon from '../assets/simon.webp';
+
 const STATS = [
   { label: 'Práctica', value: '2018 —' },
   { label: 'Obras', value: '+ 240' },
@@ -16,22 +18,18 @@ export default function Artist() {
         <em className="italic">mirada lenta.</em>
       </h2>
 
-      <div
-        className="relative mt-14 h-[420px] md:h-[640px] flex items-center justify-center bg-[#EAE4DA]"
-        style={{
-          backgroundImage:
-            'repeating-linear-gradient(135deg, #E4DED2 0 1px, transparent 1px 15px)',
-        }}
-      >
-        <span className="font-mono text-[11px] tracking-[0.34em] uppercase text-dim">
-          Portrait · Studio
-        </span>
-        <span className="absolute left-4 bottom-4 bg-ink text-paper px-3 py-1.5 font-mono text-[8.5px] tracking-[0.28em] uppercase">
-          Retrato del artista
-        </span>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-[minmax(0,320px)_1fr] gap-10 md:gap-16 mt-14 items-start">
+        <div className="relative aspect-[3/4] overflow-hidden bg-[#EAE4DA]">
+          <img
+            src={simon}
+            alt="El artista trabajando en el estudio"
+            className="h-full w-full object-cover object-top grayscale-[15%] contrast-[1.05]"
+          />
+          <span className="absolute left-4 bottom-4 bg-ink text-paper px-3 py-1.5 font-mono text-[8.5px] tracking-[0.28em] uppercase">
+            En el estudio
+          </span>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-16 mt-16">
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-3.5">
             <span className="w-8 h-px bg-ink" />
@@ -50,9 +48,8 @@ export default function Artist() {
             Cada pieza se construye en el estudio, una a la vez — boceto, conversación, trazo.
             No se replican diseños. Cada obra vive sólo en una piel o en un lienzo.
           </p>
-        </div>
-        <div className="flex flex-col justify-end gap-4">
-          <div className="h-px bg-[#DED7CB]" />
+
+          <div className="h-px bg-[#DED7CB] mt-6" />
           <div className="grid grid-cols-3 gap-5">
             {STATS.map((s) => (
               <div key={s.label} className="flex flex-col gap-2">

@@ -6,6 +6,11 @@ html {
   scroll-behavior: smooth;
 }
 
+/* El header fijo taparía el encabezado de la sección a la que se salta. */
+section[id] {
+  scroll-margin-top: 84px;
+}
+
 body {
   margin: 0;
   background: #f2eee7;
@@ -79,6 +84,36 @@ a {
   .anim-modal-in,
   .anim-fade,
   .anim-out {
+    animation-duration: 0.001ms !important;
+  }
+}
+
+@keyframes tattoo-progress {
+  from {
+    width: var(--from, 0%);
+  }
+  to {
+    width: var(--to, 100%);
+  }
+}
+
+@keyframes canvasFeaturedIn {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.anim-canvas-featured {
+  animation: canvasFeaturedIn 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-canvas-featured {
     animation-duration: 0.001ms !important;
   }
 }

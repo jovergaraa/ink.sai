@@ -22,6 +22,7 @@ pnpm-debug.log*
 
 # Claude Code
 .claude/
+.mcp.json
 
 # Editor / OS
 .vscode/*
