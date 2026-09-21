@@ -4,7 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import Agendar from './pages/Agendar';
 import MisReservas from './pages/MisReservas';
-import Admin from './pages/Admin';
+import AdminReservas from './pages/AdminReservas';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 
@@ -27,7 +27,7 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute requireRol="admin">
-              <Admin />
+              <AdminReservas />
             </ProtectedRoute>
           }
         />
