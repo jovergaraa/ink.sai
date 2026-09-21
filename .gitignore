@@ -20,8 +20,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Claude Code
-.claude/
+# Claude Code — se comparten CLAUDE.md, .claude/skills, .claude/agents y
+# .claude/launch.json; solo lo personal queda fuera
+.claude/settings.local.json
+.claude/worktrees/
 .mcp.json
 
 # Editor / OS
