@@ -12,7 +12,7 @@ backend/    Express + Prisma — solo GET /health. Su rol está por decidir (KAN
 .claude/    launch.json, skills/, agents/ — compartidos con el equipo
 ```
 
-Supabase es la base de datos y la autenticación. Proyecto `inksai`, ref `onlzelnzskqzevchnxoh`, región `us-east-2`. El frontend habla directo con Supabase; la autorización la hace RLS, no Express.
+Supabase es la base de datos y la autenticación. Proyecto `inksai`; la URL y el ref están en `frontend/.env.local` (plantilla en `.env.example`). El frontend habla directo con Supabase; la autorización la hace RLS, no Express.
 
 ## Comandos
 
@@ -43,7 +43,7 @@ npm install <pkg> --workspace frontend
 ## Flujo de trabajo
 
 - Ramas `feature/*` o `fix/*` → PR contra `develop` → merge. `main` es producción.
-- Cada tarea tiene ticket en Jira ([proyecto KAN](https://igntatto.atlassian.net/jira/software/projects/KAN/boards/1)), agrupado por Epic = módulo. Convenciones en la skill `jira-tarea`.
+- Cada tarea tiene ticket en Jira (proyecto `KAN`), agrupado por Epic = módulo. Convenciones en la skill `jira-tarea`.
 - Equipo: José (jovergaraa) y Bastian Orellana. **Antes de tomar una tarea de galería o UI, revisar si Bastian ya la hizo** — ya pasó una vez (PR #4).
 - Commits en español, imperativo, sin tilde en el título por compatibilidad. Cuerpo explica el *por qué*.
 

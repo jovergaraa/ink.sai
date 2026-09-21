@@ -5,7 +5,7 @@ description: Cómo escribir, aplicar y verificar una migración de Supabase en i
 
 # Migraciones de Supabase en ink·sai
 
-Proyecto `inksai`, ref `onlzelnzskqzevchnxoh`. Tablas en `public`: `usuarios`, `services`, `booking`. Todas con RLS.
+Proyecto `inksai` — el ref sale de `list_projects` o de `frontend/.env.local`. Tablas en `public`: `usuarios`, `services`, `booking`. Todas con RLS.
 
 ## Antes de escribir
 

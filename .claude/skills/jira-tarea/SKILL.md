@@ -5,7 +5,7 @@ description: Convenciones para crear, mover y cerrar tareas en el Jira de ink·s
 
 # Jira — proyecto KAN
 
-Sitio `igntatto.atlassian.net`, cloudId `9086190e-4719-4934-b74b-dfdee242309d`. Tablero Kanban. Tipos: **Epic**, **Historia**, **Tarea**, **Subtarea**.
+El `cloudId` se obtiene con `getAccessibleAtlassianResources` (un solo sitio). Tablero Kanban. Tipos: **Epic**, **Historia**, **Tarea**, **Subtarea**.
 
 ## Estructura: una Epic por módulo
 
