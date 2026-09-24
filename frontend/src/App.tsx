@@ -4,7 +4,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import Agendar from './pages/Agendar';
 import MisReservas from './pages/MisReservas';
-import Admin from './pages/Admin';
+import AdminReservas from './pages/AdminReservas';
+import AdminServicios from './pages/AdminServicios';
+import AdminUsuarios from './pages/AdminUsuarios';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 
@@ -27,7 +29,23 @@ function App() {
           path="/admin"
           element={
             <ProtectedRoute requireRol="admin">
-              <Admin />
+              <AdminReservas />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/servicios"
+          element={
+            <ProtectedRoute requireRol="admin">
+              <AdminServicios />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/usuarios"
+          element={
+            <ProtectedRoute requireRol="admin">
+              <AdminUsuarios />
             </ProtectedRoute>
           }
         />
