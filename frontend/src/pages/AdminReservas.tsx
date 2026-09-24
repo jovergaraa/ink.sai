@@ -28,7 +28,9 @@ const ESTADO_BADGE: Record<Estado, string> = {
 export default function AdminReservas() {
   const [reservas, setReservas] = useState<ReservaRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [filtroEstado, setFiltroEstado] = useState<'todas' | Estado>('todas');
+  const [guardandoId, setGuardandoId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -38,9 +40,13 @@ export default function AdminReservas() {
       .select('id, fecha, hora, estado, usuarios:cliente_id(nombre), services:service_id(tipo)')
       .order('fecha', { ascending: true })
       .order('hora', { ascending: true })
-      .then(({ data }) => {
+      .then(({ data, error: err }) => {
         if (cancelado) return;
-        setReservas((data as unknown as ReservaRow[]) ?? []);
+        if (err) {
+          setError(true);
+        } else {
+          setReservas((data as unknown as ReservaRow[]) ?? []);
+        }
         setLoading(false);
       });
 
@@ -53,10 +59,12 @@ export default function AdminReservas() {
     // Optimista: el panel es de uso interno y de baja concurrencia,
     // revertir en el raro caso de error es preferible a esperar el roundtrip.
     const anteriores = reservas;
+    setGuardandoId(id);
     setReservas((rows) => rows.map((r) => (r.id === id ? { ...r, estado } : r)));
 
-    const { error } = await supabase.from('booking').update({ estado }).eq('id', id);
-    if (error) setReservas(anteriores);
+    const { error: err } = await supabase.from('booking').update({ estado }).eq('id', id);
+    if (err) setReservas(anteriores);
+    setGuardandoId(null);
   }
 
   const filas = reservas.filter((r) => filtroEstado === 'todas' || r.estado === filtroEstado);
@@ -81,7 +89,7 @@ export default function AdminReservas() {
           <select
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value as typeof filtroEstado)}
-            className="bg-paper border border-dim/60 px-3 py-2 font-mono text-[11px] text-ink min-w-[170px]"
+            className="bg-transparent border-b border-ink/20 focus:border-ink outline-none px-1 py-2 font-mono text-[11px] text-ink min-w-[170px]"
           >
             <option value="todas">Todas</option>
             <option value="pendiente">Pendiente</option>
@@ -91,8 +99,14 @@ export default function AdminReservas() {
         </div>
       </div>
 
+      {error && (
+        <p role="alert" className="font-mono text-[11px] leading-relaxed border-l-2 border-ink pl-3">
+          No pudimos cargar las reservas. Intenta recargar la página.
+        </p>
+      )}
+
       <div>
-        <div className="grid grid-cols-[2fr_1.8fr_0.9fr_0.7fr_1fr_1.4fr] gap-4 pb-3 border-b border-ink">
+        <div className="hidden md:grid grid-cols-[2fr_1.8fr_0.9fr_0.7fr_1fr_1.4fr] gap-4 pb-3 border-b border-ink">
           <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-dim">Cliente</span>
           <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-dim">Servicio</span>
           <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-dim">Fecha</span>
@@ -101,7 +115,7 @@ export default function AdminReservas() {
           <span className="font-mono text-[9px] tracking-[0.2em] uppercase text-dim">Acciones</span>
         </div>
 
-        {loading && (
+        {loading && !error && (
           <div
             className="flex items-center justify-center h-40 mt-2"
             style={{
@@ -113,7 +127,7 @@ export default function AdminReservas() {
           </div>
         )}
 
-        {!loading && filas.length === 0 && (
+        {!loading && !error && filas.length === 0 && (
           <div
             className="flex items-center justify-center h-40 mt-2"
             style={{
@@ -128,22 +142,23 @@ export default function AdminReservas() {
         {filas.map((r) => (
           <div
             key={r.id}
-            className="grid grid-cols-[2fr_1.8fr_0.9fr_0.7fr_1fr_1.4fr] gap-4 py-4 border-b border-dim/30 items-center"
+            className="grid grid-cols-1 md:grid-cols-[2fr_1.8fr_0.9fr_0.7fr_1fr_1.4fr] gap-2 md:gap-4 py-4 border-b border-dim/30 md:items-center"
           >
-            <span className="text-[15px]">{r.usuarios?.nombre ?? '—'}</span>
+            <span className="font-body text-[15px]">{r.usuarios?.nombre ?? '—'}</span>
             <span className="font-mono text-[11px]">{r.services?.tipo ?? '—'}</span>
-            <span className="font-mono text-[11px] text-[#7A7268]">{r.fecha}</span>
-            <span className="font-mono text-[11px] text-[#7A7268]">{r.hora}</span>
+            <span className="font-mono text-[11px] text-[#7A7268]">{r.fecha} · {r.hora}</span>
+            <span className="hidden md:inline" />
             <span
               className={`inline-block w-fit px-2.5 py-1 font-mono text-[9px] tracking-[0.18em] uppercase ${ESTADO_BADGE[r.estado]}`}
             >
               {ESTADO_LABEL[r.estado]}
             </span>
-            <div className="flex gap-2.5 items-center">
+            <div className="flex gap-4 items-center -ml-3">
               {r.estado === 'pendiente' && (
                 <button
                   onClick={() => actualizarEstado(r.id, 'confirmado')}
-                  className="font-mono text-[9.5px] tracking-[0.16em] uppercase underline"
+                  disabled={guardandoId === r.id}
+                  className="font-mono text-[9.5px] tracking-[0.16em] uppercase border-b border-ink px-3 py-4 disabled:opacity-40"
                 >
                   Confirmar
                 </button>
@@ -151,7 +166,8 @@ export default function AdminReservas() {
               {(r.estado === 'pendiente' || r.estado === 'confirmado') && (
                 <button
                   onClick={() => actualizarEstado(r.id, 'cancelado')}
-                  className="font-mono text-[9.5px] tracking-[0.16em] uppercase underline text-[#7A7268]"
+                  disabled={guardandoId === r.id}
+                  className="font-mono text-[9.5px] tracking-[0.16em] uppercase text-dim border-b border-dim px-3 py-4 disabled:opacity-40"
                 >
                   Cancelar
                 </button>
