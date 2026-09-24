@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthModal from './AuthModal';
+import Toast from './Toast';
 import { useAuth } from '../context/AuthContext';
 
 const SECTION_LINKS = [
@@ -14,16 +15,26 @@ const SECTION_LINKS = [
 export default function Header() {
   const [authOpen, setAuthOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cuentaOpen, setCuentaOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [bienvenida, setBienvenida] = useState<string | null>(null);
+  const [esperandoBienvenida, setEsperandoBienvenida] = useState(false);
   const { session, perfil, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const cuentaBtnRef = useRef<HTMLButtonElement>(null);
+  const cuentaMenuRef = useRef<HTMLDivElement>(null);
+  const [cuentaPos, setCuentaPos] = useState({ top: 0, right: 0 });
 
-  const appLinks = [
+  // El menú móvil mantiene todo en una lista (hay espacio de sobra en
+  // vertical); en escritorio, Mis reservas y Admin se agrupan dentro del
+  // dropdown de cuenta en vez de competir como links sueltos en la barra.
+  const appLinksMovil = [
     { to: '/agendar', label: 'Agendar' },
     ...(session ? [{ to: '/mis-reservas', label: 'Mis reservas' }] : []),
     ...(perfil?.rol === 'admin' ? [{ to: '/admin', label: 'Admin' }] : []),
   ];
+  const appLinksEscritorio = [{ to: '/agendar', label: 'Agendar' }];
 
   // El mix-blend-difference es la firma del header sobre el hero, pero más
   // abajo se superpone a los eyebrows de sección y los vuelve ilegibles.
@@ -35,21 +46,73 @@ export default function Header() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // El modal no se cierra a sí mismo: lo cierra la sesión al aparecer.
+  // El modal se cierra apenas la sesión aparece. El perfil (con el
+  // nombre) llega después, en su propio efecto async dentro de
+  // AuthContext — por eso el toast no puede depender de que ambos
+  // cambien en la misma pasada: solo marcamos que estamos "esperando"
+  // el nombre, y un segundo efecto dispara el toast cuando llega.
   useEffect(() => {
-    if (session) setAuthOpen(false);
-  }, [session]);
+    if (session && authOpen) {
+      setAuthOpen(false);
+      setEsperandoBienvenida(true);
+    }
+  }, [session, authOpen]);
+
+  useEffect(() => {
+    if (esperandoBienvenida && perfil?.nombre) {
+      setBienvenida(perfil.nombre.split(' ')[0]);
+      setEsperandoBienvenida(false);
+    }
+  }, [esperandoBienvenida, perfil]);
 
   // Cambiar de ruta cierra el menú móvil; si no, queda abierto encima
   // de la página nueva.
   useEffect(() => {
     setMenuOpen(false);
+    setCuentaOpen(false);
   }, [location.pathname, location.hash]);
+
+  // El dropdown de cuenta va por portal (ver el render más abajo): el
+  // header usa mix-blend-difference sobre el hero, y ese blend se aplica
+  // a todo hijo suyo sin excepción. Un panel bg-paper adentro quedaría
+  // invertido e ilegible. Al vivir fuera, hay que calcular su posición a
+  // mano con el botón.
+  useEffect(() => {
+    if (!cuentaOpen) return;
+
+    function actualizarPos() {
+      const r = cuentaBtnRef.current?.getBoundingClientRect();
+      if (r) setCuentaPos({ top: r.bottom + 12, right: window.innerWidth - r.right });
+    }
+    actualizarPos();
+
+    function handleClick(e: MouseEvent) {
+      const target = e.target as Node;
+      if (cuentaBtnRef.current?.contains(target) || cuentaMenuRef.current?.contains(target)) {
+        return;
+      }
+      setCuentaOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setCuentaOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('resize', actualizarPos);
+    window.addEventListener('scroll', actualizarPos, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('keydown', handleKey);
+      window.removeEventListener('resize', actualizarPos);
+      window.removeEventListener('scroll', actualizarPos, true);
+    };
+  }, [cuentaOpen]);
 
   // Sin el navigate, cerrar sesión desde /admin deja al usuario
   // mirando la pantalla de acceso restringido.
   async function handleSalir() {
     setMenuOpen(false);
+    setCuentaOpen(false);
     await signOut();
     navigate('/');
   }
@@ -57,6 +120,16 @@ export default function Header() {
   function abrirLogin() {
     setMenuOpen(false);
     setAuthOpen(true);
+  }
+
+  // Si ya está en el home, <Link to="/"> no dispara navegación (misma
+  // ruta) y el scroll no se mueve solo. Forzamos el scroll arriba en ese
+  // caso; si viene de otra ruta, el Link ya lo deja al tope del home.
+  function handleLogoClick(e: React.MouseEvent) {
+    if (location.pathname === '/') {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   }
 
   const tinta = scrolled ? 'text-ink' : 'text-paper';
@@ -69,7 +142,7 @@ export default function Header() {
           : 'mix-blend-difference'
       }`}
     >
-      <Link to="/" className={`font-serif italic text-[19px] tracking-wide ${tinta}`}>
+      <Link to="/" onClick={handleLogoClick} className={`font-serif italic text-[19px] tracking-wide ${tinta}`}>
         ink·sai
       </Link>
 
@@ -83,18 +156,28 @@ export default function Header() {
             {l.label}
           </Link>
         ))}
-        {appLinks.map((l) => (
+        {appLinksEscritorio.map((l) => (
           <Link key={l.to} to={l.to}>
             {l.label}
           </Link>
         ))}
         {session ? (
-          <>
-            <span className="text-dim">{perfil?.nombre ?? 'Cuenta'}</span>
-            <button onClick={handleSalir} className="font-mono uppercase tracking-[0.26em]">
-              Salir
-            </button>
-          </>
+          <button
+            ref={cuentaBtnRef}
+            type="button"
+            onClick={() => setCuentaOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={cuentaOpen}
+            className="flex items-center gap-1.5 font-mono uppercase tracking-[0.26em]"
+          >
+            {perfil?.nombre?.split(' ')[0] ?? 'Cuenta'}
+            <span
+              aria-hidden="true"
+              className={`inline-block text-[8px] transition-transform duration-200 ${cuentaOpen ? '-scale-y-100' : ''}`}
+            >
+              ▾
+            </span>
+          </button>
         ) : (
           <button onClick={abrirLogin} className="font-mono uppercase tracking-[0.26em]">
             Ingresar
@@ -114,7 +197,7 @@ export default function Header() {
 
       {menuOpen && (
         <MenuMovil
-          appLinks={appLinks}
+          appLinks={appLinksMovil}
           nombre={perfil?.nombre}
           haySesion={Boolean(session)}
           onCerrar={() => setMenuOpen(false)}
@@ -124,6 +207,46 @@ export default function Header() {
       )}
 
       {authOpen && <AuthModal onClose={() => setAuthOpen(false)} />}
+      {bienvenida && <Toast onDone={() => setBienvenida(null)}>Bienvenido, {bienvenida}</Toast>}
+
+      {cuentaOpen &&
+        createPortal(
+          <div
+            ref={cuentaMenuRef}
+            role="menu"
+            style={{ top: cuentaPos.top, right: cuentaPos.right }}
+            className="fixed z-[300] w-44 border border-ink/15 bg-paper py-1.5 text-ink anim-fade"
+          >
+            {perfil?.rol === 'admin' && (
+              <Link
+                to="/admin"
+                role="menuitem"
+                onClick={() => setCuentaOpen(false)}
+                className="block px-4 py-2.5 font-mono text-[9.5px] tracking-[0.2em] uppercase hover:bg-ink/[0.04]"
+              >
+                Panel de control
+              </Link>
+            )}
+            <Link
+              to="/mis-reservas"
+              role="menuitem"
+              onClick={() => setCuentaOpen(false)}
+              className="block px-4 py-2.5 font-mono text-[9.5px] tracking-[0.2em] uppercase hover:bg-ink/[0.04]"
+            >
+              Mis reservas
+            </Link>
+            <div className="my-1.5 border-t border-ink/10" />
+            <button
+              type="button"
+              role="menuitem"
+              onClick={handleSalir}
+              className="block w-full px-4 py-2.5 text-left font-mono text-[9.5px] tracking-[0.2em] uppercase text-[#7A7268] hover:bg-ink/[0.04] hover:text-ink"
+            >
+              Cerrar sesión
+            </button>
+          </div>,
+          document.body
+        )}
     </header>
   );
 }
