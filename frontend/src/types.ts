@@ -15,4 +15,7 @@ export interface Perfil {
   nombre: string;
   rol: Rol;
   created_at?: string;
+  rut?: string | null;
+  telefono?: string | null;
+  fecha_nacimiento?: string | null;
 }

@@ -80,10 +80,61 @@ a {
   animation: modalIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+@keyframes overlayBlurIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+.anim-overlay-blur {
+  will-change: opacity, backdrop-filter;
+  animation: overlayBlurIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.anim-toast-in {
+  animation: toastIn 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes toastOut {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+}
+
+.anim-toast-out {
+  animation: toastOut 280ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anim-modal-in,
   .anim-fade,
-  .anim-out {
+  .anim-out,
+  .anim-overlay-blur,
+  .anim-toast-in,
+  .anim-toast-out {
     animation-duration: 0.001ms !important;
   }
 }

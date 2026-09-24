@@ -12,13 +12,26 @@ interface ResultadoRegistro extends ResultadoAuth {
   necesitaConfirmar: boolean;
 }
 
+type ResultadoVerificacion = ResultadoAuth;
+
+interface DatosRegistro {
+  correo: string;
+  password: string;
+  nombre: string;
+  rut: string;
+  telefono: string;
+  fechaNacimiento: string;
+  aceptoTerminos: boolean;
+}
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   perfil: Perfil | null;
   loading: boolean;
   signIn: (correo: string, password: string) => Promise<ResultadoAuth>;
-  signUp: (correo: string, password: string, nombre: string) => Promise<ResultadoRegistro>;
+  signUp: (datos: DatosRegistro) => Promise<ResultadoRegistro>;
+  verifyOtp: (correo: string, token: string) => Promise<ResultadoVerificacion>;
   signOut: () => Promise<void>;
 }
 
@@ -43,6 +56,10 @@ function traducirError(error: AuthError): string {
       return 'Demasiados intentos. Espera unos minutos.';
     case 'validation_failed':
       return 'Revisa que el correo tenga un formato válido.';
+    case 'otp_expired':
+      return 'El código venció. Pide uno nuevo.';
+    case 'otp_disabled':
+      return 'No pudimos verificar el código. Intenta de nuevo.';
   }
 
   if (mensaje.includes('Password should be at least')) {
@@ -53,6 +70,9 @@ function traducirError(error: AuthError): string {
   }
   if (mensaje.includes('Email not confirmed')) {
     return 'Debes confirmar tu correo antes de ingresar. Revisa tu bandeja.';
+  }
+  if (mensaje.includes('Token has expired') || mensaje.includes('invalid')) {
+    return 'El código es incorrecto o venció. Revísalo o pide uno nuevo.';
   }
 
   return 'No pudimos completar la acción. Intenta de nuevo.';
@@ -102,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase
       .from('usuarios')
-      .select('id, correo, nombre, rol, created_at')
+      .select('id, correo, nombre, rol, created_at, rut, telefono, fecha_nacimiento')
       .eq('id', userId)
       // maybeSingle: si el perfil quedó huérfano devuelve null en vez de error
       .maybeSingle()
@@ -134,12 +154,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: error ? traducirError(error) : null };
       },
 
-      async signUp(correo, password, nombre) {
+      async signUp({ correo, password, nombre, rut, telefono, fechaNacimiento, aceptoTerminos }) {
         const { data, error } = await supabase.auth.signUp({
           email: correo,
           password,
           options: {
-            data: { nombre },
+            data: {
+              nombre,
+              rut,
+              telefono,
+              fecha_nacimiento: fechaNacimiento,
+              acepto_terminos: aceptoTerminos,
+            },
             emailRedirectTo: `${window.location.origin}/login`,
           },
         });
@@ -151,6 +177,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Con la protección anti-enumeración, un correo ya registrado
         // devuelve un usuario falso sin identidades. No lo delatamos.
         return { error: null, necesitaConfirmar: data.session === null };
+      },
+
+      async verifyOtp(correo, token) {
+        const { error } = await supabase.auth.verifyOtp({
+          email: correo,
+          token,
+          type: 'signup',
+        });
+        // Éxito: verifyOtp ya deja la sesión activa, onAuthStateChange
+        // la recoge solo — no hay nada más que hacer acá.
+        return { error: error ? traducirError(error) : null };
       },
 
       async signOut() {
