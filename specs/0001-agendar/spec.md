@@ -35,7 +35,7 @@ Las marcadas 2026-09-26 vienen del cuestionario respondido por Simón Vargas Cá
 | D9 | **El hueco se bloquea con la primera solicitud.** El primero que lo pide lo toma; los demás dejan de verlo mientras el artista decide | 2026-09-26 |
 | D10 | **Seña de $10.000 por transferencia**, con comprobante. No hay pago en línea | 2026-09-26 |
 | D11 | **Cancelación con 2 días de anticipación.** Con menos, o si no llega, pierde el abono. Puede reprogramar **una vez**. Si cancela el estudio, el cliente elige otra fecha o recupera el abono | 2026-09-26 |
-| D12 | **La imagen de referencia es obligatoria** al reservar | 2026-09-26 |
+| D12 | ~~La imagen de referencia es obligatoria al reservar~~ → **opcional por ahora.** Simón la había pedido obligatoria, pero exigirla antes de enviar corta a quien todavía no tiene una idea a mano. Se envía sin imagen y se coordina después; `booking.referencia_path` queda en null. **Revisar con Simón** si vuelve a ser obligatoria | 2026-09-26, revertida 2026-09-27 |
 | D13 | **Solo mayores de 18.** No se atiende a menores ni con autorización | 2026-09-26 |
 | D14 | **Catálogo inicial**: sesión corta (1–2 h, $30.000), media (3–4 h, $50.000), larga (5–6 h, $70.000), tatuaje pequeño hasta 5 cm (1 h, $30.000), retoque (gratis, garantía 2 meses). Precios **semifijos**: se muestran como "desde", varían por tamaño y dificultad | 2026-09-26 |
 
@@ -65,7 +65,7 @@ Vienen del esquema y las políticas ya aplicadas en Supabase. El detalle técnic
 2. Elige un servicio.
 3. Ve los **huecos publicados donde ese servicio cabe** (D7): solo futuros, solo los que nadie haya tomado (D9). Agrupados por fecha.
 4. Elige un hueco.
-5. Sube una **imagen de referencia** (obligatoria, D12) y escribe un comentario opcional.
+5. Puede subir una **imagen de referencia** (opcional, D12) y escribir un comentario opcional.
 6. Confirma.
    - **Si no tiene sesión:** se abre el modal de registro/login. Al volver, **el borrador sigue ahí** (KAN-51). Si es cuenta nueva, tiene que confirmar el correo — el borrador debe sobrevivir a que cierre la pestaña.
    - **Si tiene sesión:** se crea la reserva tomando ese hueco, con `estado = 'pendiente'` (D6). *(El paso de la seña depende de la decisión 1)*
@@ -90,7 +90,7 @@ Vienen del esquema y las políticas ya aplicadas en Supabase. El detalle técnic
 2. Elegido "sesión larga" (5–6 h), la lista muestra **solo** huecos de 5 h o más; los de 1 h no aparecen.
 3. Dados tres huecos que calzan —uno ayer, uno mañana a las 15:00 y uno ya solicitado— el cliente ve **solo** el de mañana a las 15:00.
 4. Sin huecos que calcen, la página muestra el estado vacío con el enlace a Instagram, no una lista en blanco.
-5. No se puede confirmar sin imagen de referencia.
+5. Se puede confirmar sin imagen de referencia: la reserva queda con `referencia_path` en null.
 6. Un visitante que confirma sin sesión ve el modal de login y, al autenticarse, vuelve al formulario **con servicio, hueco, referencia y comentario intactos**.
 7. Al crear la reserva, queda con `cliente_id = auth.uid()`, el hueco elegido y `estado = 'pendiente'`.
 8. Dos peticiones simultáneas al mismo hueco resultan en exactamente una fila viva en `booking`; la segunda recibe un mensaje claro y el hueco desaparece de su lista.

@@ -11,9 +11,12 @@ import AdminUsuarios from './pages/AdminUsuarios';
 import Login from './pages/Login';
 import NotFound from './pages/NotFound';
 
+// overflow-x-clip y no -hidden: hidden fuerza overflow-y:auto, con lo que este
+// div pasa a ser el contenedor de scroll y cualquier position:sticky de adentro
+// deja de pegarse (la ficha de /agendar). clip recorta igual sin ese efecto.
 function App() {
   return (
-    <div className="min-h-screen bg-paper text-ink selection:bg-ink selection:text-paper overflow-x-hidden">
+    <div className="min-h-screen bg-paper text-ink selection:bg-ink selection:text-paper overflow-x-clip">
       <Header />
       <Routes>
         <Route path="/" element={<Home />} />
