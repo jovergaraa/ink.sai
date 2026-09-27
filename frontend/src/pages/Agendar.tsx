@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from '../components/AuthModal';
+import { fmtDuracion, fmtFecha, fmtMonto } from '../lib/formato';
 
 interface Servicio {
   id: string;
@@ -40,10 +41,6 @@ const CLASES_LABEL = 'block font-mono text-[9px] tracking-[0.26em] uppercase tex
 const CLASES_INPUT =
   'w-full bg-transparent border-b border-ink/20 focus:border-ink outline-none font-body text-lg py-2 transition-colors';
 
-function fmtMonto(n: number) {
-  return n === 0 ? 'Gratis' : '$' + n.toLocaleString('es-CL');
-}
-
 function fmtPrecio(n: number) {
   return n === 0 ? 'Gratis' : 'desde ' + fmtMonto(n);
 }
@@ -75,13 +72,6 @@ function Fila({
   );
 }
 
-function fmtDuracion(min: number) {
-  const h = Math.floor(min / 60);
-  const r = min % 60;
-  if (h === 0) return `${r} min`;
-  return r === 0 ? `${h} h` : `${h} h ${r} min`;
-}
-
 // La semana parte en lunes, como en Chile.
 const DIAS_SEMANA = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
@@ -91,17 +81,6 @@ function isoDe(a: number, m: number, d: number) {
 
 function fmtMes(a: number, m: number) {
   return new Date(a, m, 1).toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
-}
-
-function fmtFecha(iso: string) {
-  // Partido a mano: new Date('2026-09-30') se interpreta como UTC y en Chile
-  // devuelve el día anterior.
-  const [a, m, d] = iso.split('-').map(Number);
-  return new Date(a, m - 1, d).toLocaleDateString('es-CL', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
 }
 
 function leerBorrador(): Borrador | null {
