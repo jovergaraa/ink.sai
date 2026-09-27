@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 
 const TABS = [
   { to: '/admin', label: 'Reservas', end: true },
+  { to: '/admin/horarios', label: 'Horarios' },
   { to: '/admin/servicios', label: 'Servicios' },
   { to: '/admin/usuarios', label: 'Usuarios' },
   { to: '/admin/opiniones', label: 'Opiniones' },

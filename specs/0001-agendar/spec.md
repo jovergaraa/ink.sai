@@ -1,6 +1,6 @@
 # 0001 — Agendar una sesión
 
-**Estado:** borrador con decisiones pendientes · **Epic:** KAN-7 · **Última revisión:** 2026-09-23
+**Estado:** decisiones cerradas, listo para implementar · **Epic:** KAN-7 · **Última revisión:** 2026-09-26
 
 ---
 
@@ -14,61 +14,40 @@ Hoy `/agendar` es un placeholder. Todo el valor del producto está detrás de es
 
 | Actor | Puede |
 |---|---|
-| **Visitante** (sin sesión) | Ver el catálogo de servicios y explorar la disponibilidad. No puede reservar |
-| **Cliente** (`rol = 'cliente'`) | Todo lo anterior, más crear una reserva a su nombre |
-| **Admin** (`rol = 'admin'`) | Confirmar, cancelar y ver todas las reservas (fuera del alcance de esta spec, ver `0002-panel-admin`) |
+| **Visitante** (sin sesión) | Ver el catálogo de servicios y los horarios disponibles. No puede reservar |
+| **Cliente** (`rol = 'cliente'`) | Todo lo anterior, más solicitar una sesión a su nombre |
+| **Admin** (el artista) | Publicar horarios, aprobar y rechazar solicitudes (ver `0002-panel-admin`) |
 
 ## 3. Decisiones tomadas
 
+Las marcadas 2026-09-26 vienen del cuestionario respondido por Simón Vargas Cáceres (`specs/preguntas-cliente.docx`).
+
 | # | Decisión | Cuándo |
 |---|---|---|
-| D1 | `/agendar` es **pública**. El login se pide solo al confirmar la reserva, para no perder al visitante que está evaluando | sept 2026 |
-| D2 | El registro exige **confirmación por correo**. Un cliente nuevo no puede completar la reserva en la misma sesión sin pasar por su bandeja | sept 2026 |
+| D1 | `/agendar` es **pública**. El login se pide solo al confirmar, para no perder al visitante que está evaluando | sept 2026 |
+| D2 | El registro exige **confirmación por correo**. Un cliente nuevo no completa la reserva sin pasar por su bandeja | sept 2026 |
 | D3 | Una reserva nace con `estado = 'pendiente'` | implícito en el esquema |
 | D4 | El catálogo lo lee cualquiera, pero solo los servicios con `activo = true` | política RLS vigente |
+| D5 | **La disponibilidad son huecos que abre el artista.** No hay horario semanal ni cálculo de slots: publica los huecos concretos en los que puede atender | 2026-09-23 |
+| D6 | **La reserva la aprueba el artista.** Tomar un hueco no confirma nada | 2026-09-23 |
+| D7 | **Cada hueco lleva una duración.** El artista abre huecos de distinto largo; el cliente elige un servicio y solo ve los huecos donde ese servicio cabe | 2026-09-26 |
+| D8 | **Rechazar una solicitud libera el hueco automáticamente**: vuelve a la lista pública sin intervención del artista | 2026-09-26 |
+| D9 | **El hueco se bloquea con la primera solicitud.** El primero que lo pide lo toma; los demás dejan de verlo mientras el artista decide | 2026-09-26 |
+| D10 | **Seña de $10.000 por transferencia**, con comprobante. No hay pago en línea | 2026-09-26 |
+| D11 | **Cancelación con 2 días de anticipación.** Con menos, o si no llega, pierde el abono. Puede reprogramar **una vez**. Si cancela el estudio, el cliente elige otra fecha o recupera el abono | 2026-09-26 |
+| D12 | **La imagen de referencia es obligatoria** al reservar | 2026-09-26 |
+| D13 | **Solo mayores de 18.** No se atiende a menores ni con autorización | 2026-09-26 |
+| D14 | **Catálogo inicial**: sesión corta (1–2 h, $30.000), media (3–4 h, $50.000), larga (5–6 h, $70.000), tatuaje pequeño hasta 5 cm (1 h, $30.000), retoque (gratis, garantía 2 meses). Precios **semifijos**: se muestran como "desde", varían por tamaño y dificultad | 2026-09-26 |
 
 ## 4. Decisiones pendientes
 
-Esto es lo que bloquea la implementación. Cada una necesita respuesta del artista.
-
-> **[NECESITA DECISIÓN 1] — Catálogo de servicios**
-> La tabla `services` está vacía. ¿Qué tipos de sesión ofrece, con qué duración y precio?
-> Ejemplos de estructura: consulta (30 min), boceto, sesión corta (2 h), sesión larga (4 h), retoque.
-> ¿El precio es fijo o "desde"? Un tatuaje suele cotizarse por pieza, no por hora.
-> **Bloquea:** §6 paso 1, §8 criterio 1. **Ticket:** KAN-19.
-
-> **[NECESITA DECISIÓN 2] — Modelo de disponibilidad**
-> El esquema tiene `fecha` y `hora`, pero nada que diga qué horas están libres. Sin esto el formulario acepta cualquier fecha y el artista rechaza a mano.
-> - **a)** Horario semanal fijo + bloqueos puntuales (vacaciones, días libres). Los slots se calculan: horario − bloqueos − reservas.
-> - **b)** El artista abre huecos manualmente; solo se puede reservar en los huecos abiertos.
-> - **c)** Sin disponibilidad: el cliente propone fecha/hora y el artista acepta o contrapropone.
-> Preguntas: ¿qué días y horario atiende? ¿cuántas sesiones por día como máximo? ¿deja tiempo entre sesiones?
-> **Bloquea:** §6 pasos 2–3, §7 casos B1–B3, §8 criterios 2–4. **Ticket:** KAN-46.
-
-> **[NECESITA DECISIÓN 3] — Confirmación: automática o manual**
-> ¿Una reserva en un slot libre queda **confirmada al instante**, o queda **pendiente** hasta que el artista la apruebe?
-> Manual da control al artista pero introduce espera; automática convierte mejor pero lo compromete.
-> **Bloquea:** §6 paso 5, §9 (qué dice la pantalla de éxito). **Ticket:** KAN-20.
-
-> **[NECESITA DECISIÓN 4] — Seña**
-> ¿Se cobra algo para confirmar?
-> - **a)** No. Simple, más no-shows.
-> - **b)** Transferencia + comprobante que sube el cliente; el admin confirma al verlo. Sin integración, pero manual.
-> - **c)** Pago en línea (Mercado Pago / Webpay). Confirmación automática, requiere backend y webhook — fuerza la decisión de KAN-25.
-> **Bloquea:** §6 paso 5, §8 criterio 6. **Ticket:** KAN-49.
-
-> **[NECESITA DECISIÓN 5] — Cancelación y reprogramación**
-> ¿Hasta cuántas horas antes se puede cancelar sin costo? ¿Se puede reprogramar, cuántas veces? ¿Qué pasa con la seña si cancela tarde o no aparece? ¿Y si cancela el estudio?
-> **Bloquea:** §7 caso B5, y las specs `0003-mis-reservas`. **Ticket:** KAN-79.
-
-> **[NECESITA DECISIÓN 6] — Imagen de referencia**
-> ¿El cliente puede (o debe) adjuntar una foto de referencia? Para un tatuaje suele ser lo primero que se manda.
-> ¿Obligatoria para algunos servicios (tatuaje) y opcional para otros (visita al estudio)?
-> **Bloquea:** §6 paso 4. **Ticket:** KAN-48.
-
-> **[NECESITA DECISIÓN 7] — Menores de edad**
-> ¿Se atiende a menores con autorización, o hay edad mínima? Cambia si el formulario pide fecha de nacimiento y si el registro debe advertirlo.
-> **Bloquea:** §7 caso B6. **Ticket:** KAN-78.
+> **[NECESITA DECISIÓN 1] — Cuándo y cómo llega el comprobante de la seña**
+> Simón dijo "por transferencia, el cliente me manda el comprobante", pero no si lo sube al sitio o se lo manda por WhatsApp. Y el orden importa:
+> - **a)** El cliente reserva → sube el comprobante en el sitio → el artista aprueba viendo el pago.
+> - **b)** El cliente reserva → el artista aprueba → recién entonces el cliente transfiere.
+> - **c)** El comprobante va por WhatsApp, fuera del sitio. El sitio solo muestra los datos bancarios.
+> La **a)** protege al artista de no-shows pero mete un paso más antes de tener respuesta. La **c)** es la más barata de construir.
+> **Bloquea:** §6 paso 6, §8 criterio 7. **Ticket:** KAN-49.
 
 ## 5. Restricciones conocidas
 
@@ -77,50 +56,53 @@ Vienen del esquema y las políticas ya aplicadas en Supabase. El detalle técnic
 - `booking` guarda `cliente_id`, `service_id`, `fecha`, `hora`, `estado`, `comentario`.
 - `estado` solo admite `pendiente`, `confirmado`, `cancelado`.
 - RLS: un cliente solo puede insertar reservas con `cliente_id = auth.uid()`, y solo ve las suyas. **Un visitante sin sesión no puede insertar nada** — de ahí D1.
-- Las horas hoy son `time without time zone`: funcionan mientras artista y clientes estén en la misma ciudad. Ver KAN-52.
+- Las horas son `time without time zone`. Artista y clientes están en Santiago; KAN-52 sigue abierta para cuando deje de ser cierto.
+- `usuarios` ya guarda `fecha_nacimiento`, lo que permite aplicar D13 sin cambios de esquema.
 
 ## 6. Flujo principal
 
-1. El visitante entra a `/agendar` y ve el catálogo de servicios activos con su duración y precio. *(Bloqueado por D1)*
-2. Elige un servicio. *(Bloqueado por D2: qué días se muestran disponibles)*
-3. Elige fecha y hora entre los slots libres para ese servicio. *(Bloqueado por D2)*
-4. Escribe un comentario opcional describiendo la idea, y adjunta una referencia. *(Bloqueado por D6)*
-5. Confirma.
-   - **Si no tiene sesión:** se abre el modal de registro/login. Al volver, **el borrador sigue ahí** (KAN-51). Si es cuenta nueva, tiene que confirmar el correo antes de poder completar — el borrador debe sobrevivir a que cierre la pestaña.
-   - **Si tiene sesión:** se crea la reserva. *(Bloqueado por D3 y D4: en qué estado queda y si hay que pagar)*
-6. Ve una pantalla de confirmación con el resumen y qué pasa ahora (KAN-53), y recibe un correo (KAN-64).
+1. El visitante entra a `/agendar` y ve el catálogo de servicios activos con su duración y precio "desde".
+2. Elige un servicio.
+3. Ve los **huecos publicados donde ese servicio cabe** (D7): solo futuros, solo los que nadie haya tomado (D9). Agrupados por fecha.
+4. Elige un hueco.
+5. Sube una **imagen de referencia** (obligatoria, D12) y escribe un comentario opcional.
+6. Confirma.
+   - **Si no tiene sesión:** se abre el modal de registro/login. Al volver, **el borrador sigue ahí** (KAN-51). Si es cuenta nueva, tiene que confirmar el correo — el borrador debe sobrevivir a que cierre la pestaña.
+   - **Si tiene sesión:** se crea la reserva tomando ese hueco, con `estado = 'pendiente'` (D6). *(El paso de la seña depende de la decisión 1)*
+7. Ve una pantalla que deja claro que **el artista todavía tiene que aprobarla**, con las condiciones de cancelación (D11) y los datos para transferir la seña (D10).
 
 ## 7. Casos borde
 
 | | Situación | Comportamiento esperado |
 |---|---|---|
-| B1 | Dos clientes reservan el mismo slot en el mismo instante | Solo uno lo obtiene. El otro ve "ese horario acaba de ocuparse, elige otro" — no un error genérico. Debe garantizarse en la base de datos, no solo en la UI (KAN-47) |
-| B2 | El slot se ocupa mientras el cliente llenaba el formulario | Igual que B1, al confirmar |
-| B3 | No hay ningún horario disponible en el mes | Estado vacío explícito con un canal alternativo (WhatsApp), no un calendario en blanco |
-| B4 | El cliente abandona tras el registro y vuelve al día siguiente | El borrador se recupera o se descarta limpiamente. Definir vigencia (¿24 h?) |
-| B5 | El cliente quiere cancelar o cambiar la fecha | *(Bloqueado por D5)* |
-| B6 | Un menor intenta reservar | *(Bloqueado por D7)* |
+| B1 | Dos clientes toman el mismo hueco a la vez | Solo uno lo obtiene (D9). El otro ve "ese horario acaba de ocuparse, elige otro" — no un error genérico. Se garantiza en la base: un hueco admite como máximo una reserva viva (KAN-47) |
+| B2 | El hueco se ocupa mientras el cliente llenaba el formulario | Igual que B1, al confirmar |
+| B3 | El artista no tiene huecos abiertos, o ninguno donde quepa el servicio elegido | Estado vacío explícito, con el Instagram del estudio como alternativa. Si el problema es la duración, decirlo: "no hay horarios largos disponibles" |
+| B4 | El cliente abandona tras el registro y vuelve al día siguiente | El borrador se recupera si el hueco sigue libre; si no, se avisa y se pide elegir otro. Vigencia 24 h |
+| B5 | El artista rechaza la solicitud | El hueco vuelve solo a la lista pública (D8) y el cliente recibe aviso |
+| B6 | Un menor de 18 intenta registrarse o reservar | Se bloquea en el registro, validando `fecha_nacimiento` (D13) |
 | B7 | El servicio elegido se desactiva entre que lo eligió y confirma | Avisar y pedir que elija otro |
+| B8 | El artista borra un hueco que ya tiene una solicitud pendiente | No se puede borrar sin más: avisar y obligarlo a rechazar la solicitud primero |
 
 ## 8. Criterios de aceptación
 
-Verificables. Los marcados con 🔒 dependen de decisiones pendientes.
-
-1. 🔒 Un visitante sin sesión ve el catálogo completo de servicios activos con nombre, duración y precio.
-2. 🔒 Dado un servicio de 120 min, horario 10:00–18:00 y una reserva existente a las 14:00, el cliente ve exactamente los slots 10:00, 12:00 y 16:00.
-3. 🔒 Un día bloqueado por el artista no ofrece ningún slot y se ve claramente como no disponible.
-4. 🔒 No se puede seleccionar una fecha pasada ni el mismo día con menos de X horas de antelación.
-5. Un visitante que confirma sin sesión ve el modal de login y, al autenticarse, vuelve al formulario **con servicio, fecha, hora y comentario intactos**.
-6. 🔒 Al crear la reserva, queda en la base con `cliente_id = auth.uid()` y el estado que corresponda.
-7. Dos peticiones simultáneas al mismo slot resultan en exactamente una fila en `booking`; la segunda recibe un mensaje claro.
-8. Tras reservar, el cliente ve el resumen y la reserva aparece en `/mis-reservas`.
+1. Un visitante sin sesión ve los cinco servicios activos con su duración y precio "desde".
+2. Elegido "sesión larga" (5–6 h), la lista muestra **solo** huecos de 5 h o más; los de 1 h no aparecen.
+3. Dados tres huecos que calzan —uno ayer, uno mañana a las 15:00 y uno ya solicitado— el cliente ve **solo** el de mañana a las 15:00.
+4. Sin huecos que calcen, la página muestra el estado vacío con el enlace a Instagram, no una lista en blanco.
+5. No se puede confirmar sin imagen de referencia.
+6. Un visitante que confirma sin sesión ve el modal de login y, al autenticarse, vuelve al formulario **con servicio, hueco, referencia y comentario intactos**.
+7. Al crear la reserva, queda con `cliente_id = auth.uid()`, el hueco elegido y `estado = 'pendiente'`.
+8. Dos peticiones simultáneas al mismo hueco resultan en exactamente una fila viva en `booking`; la segunda recibe un mensaje claro y el hueco desaparece de su lista.
+9. La pantalla de éxito dice que falta la aprobación del artista, muestra la política de cancelación de 2 días y los datos para transferir los $10.000.
+10. Si el artista rechaza la solicitud, el hueco vuelve a aparecer para otros clientes.
 
 ## 9. Fuera de alcance
 
-- Gestión de la reserva por parte del artista → `0002-panel-admin` (KAN-22, KAN-54, KAN-55).
-- Ver y cancelar reservas propias → `0003-mis-reservas` (KAN-21, KAN-58).
-- Correos y recordatorios → Epic KAN-43.
-- Cotización o presupuesto del tatuaje. Esta feature agenda una cita, no cierra un precio de la pieza.
+- Publicar y gestionar huecos, aprobar y rechazar solicitudes → `0002-panel-admin` (KAN-22, KAN-54, KAN-55).
+- Ver, cancelar y reprogramar reservas propias → `0003-mis-reservas` (KAN-21, KAN-58).
+- Correos y avisos → Epic KAN-43. **Simón pidió los avisos por WhatsApp**, que requiere API de Meta o Twilio; se evalúa aparte.
+- Cotización o presupuesto de la pieza. Esta feature agenda una cita, no cierra un precio.
 
 ## 10. Tickets
 
