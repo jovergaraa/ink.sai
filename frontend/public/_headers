@@ -1,0 +1,10 @@
+# Cabeceras que aplica Cloudflare Pages a cada respuesta.
+# Deliberadamente sin Content-Security-Policy: el sitio habla con Supabase y
+# con su bucket de imágenes, y una CSP mal puesta rompe el login en silencio.
+# Va en su propio ticket, no acá.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), microphone=(), camera=()

@@ -1,0 +1,5 @@
+# /agendar, /mis-reservas y /admin no son archivos en disco: los resuelve
+# react-router en el navegador. Sin esta regla, entrar directo a esas rutas o
+# recargar estando ahí devuelve 404, porque Cloudflare busca un archivo que no
+# existe. El 200 sirve index.html sin redirigir, así la URL se mantiene.
+/*    /index.html   200
