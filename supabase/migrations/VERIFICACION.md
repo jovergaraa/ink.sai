@@ -105,3 +105,52 @@ conocidos y ninguno nuevo:
 
 **No debe aparecer `security_definer_view`.** Si vuelve, alguien recreó `huecos_libres`
 leyendo `booking`: hay que volver a derivarlo por `huecos.tomado`.
+
+## 20260930000001 — bloqueos
+
+**Aplicada y verificada el 2026-09-30.** Todas las pruebas de abajo pasaron.
+
+### 1. Un anónimo ve los bloqueos
+
+```sql
+begin;
+  select set_config('role', 'anon', true),
+         set_config('request.jwt.claims', '{"role":"anon"}', true);
+
+  select count(*) as bloqueos_visibles from public.bloqueos;  -- sin error
+rollback;
+```
+
+### 2. Solo un admin puede bloquear
+
+```sql
+begin;
+  select set_config('role', 'authenticated', true),
+         set_config('request.jwt.claims', '{"sub":"<admin_id>","role":"authenticated"}', true);
+
+  insert into public.bloqueos (fecha, hora_inicio, hora_fin, motivo)
+  values ('2026-10-15', '09:00', '14:00', 'Prueba');  -- funciona
+rollback;
+
+begin;
+  select set_config('role', 'authenticated', true),
+         set_config('request.jwt.claims', '{"sub":"<cliente_id>","role":"authenticated"}', true);
+
+  insert into public.bloqueos (fecha, hora_inicio, hora_fin)
+  values ('2026-10-16', '09:00', '14:00');  -- 42501, rechazado
+rollback;
+```
+
+### 3. Rango inválido rechazado
+
+```sql
+begin;
+  insert into public.bloqueos (fecha, hora_inicio, hora_fin)
+  values ('2026-10-17', '14:00', '09:00');  -- 23514, check constraint
+rollback;
+```
+
+### 4. Advisors
+
+Sin cambios respecto a la sección anterior: los mismos dos warnings conocidos,
+ninguno nuevo introducido por `bloqueos`.
