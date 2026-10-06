@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /mis-reservas
+
+Sitemap: https://inksai.cl/sitemap.xml
