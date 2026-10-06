@@ -3,7 +3,7 @@ import type { FormEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
-type Tab = 'entrar' | 'registro';
+type Tab = 'entrar' | 'registro' | 'reset';
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -162,16 +162,25 @@ export default function AuthModal({ onClose }: { onClose: () => void }) {
           <span className="font-serif italic text-2xl text-ink">ink·sai</span>
         </div>
 
-        {tab === 'entrar' ? (
+        {tab === 'entrar' && (
           <EntrarForm
             key="entrar"
             onSwitch={() => setTab('registro')}
+            onOlvidoPassword={() => setTab('reset')}
             onDirtyChange={setTieneTexto}
           />
-        ) : (
+        )}
+        {tab === 'registro' && (
           <RegistroForm
             key="registro"
             onSwitch={() => setTab('entrar')}
+            onDirtyChange={setTieneTexto}
+          />
+        )}
+        {tab === 'reset' && (
+          <ResetPasswordForm
+            key="reset"
+            onVolver={() => setTab('entrar')}
             onDirtyChange={setTieneTexto}
           />
         )}
@@ -256,9 +265,11 @@ function Aviso({ children }: { children: React.ReactNode }) {
 
 function EntrarForm({
   onSwitch,
+  onOlvidoPassword,
   onDirtyChange,
 }: {
   onSwitch: () => void;
+  onOlvidoPassword: () => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { signIn } = useAuth();
@@ -321,9 +332,13 @@ function EntrarForm({
       </button>
 
       <p className="mt-5">
-        <a href="#" className="font-body italic text-sm text-[#7A7268] hover:text-ink">
+        <button
+          type="button"
+          onClick={onOlvidoPassword}
+          className="font-body italic text-sm text-[#7A7268] hover:text-ink"
+        >
           ¿Olvidaste tu contraseña?
-        </a>
+        </button>
       </p>
 
       <p className="mt-9 border-t border-[#DED7CB] pt-6 font-body text-sm text-[#7A7268]">
@@ -579,6 +594,165 @@ function VerificarCodigoForm({ correo }: { correo: string }) {
       >
         {enviando ? 'Verificando…' : 'Confirmar código'}
       </button>
+    </form>
+  );
+}
+
+// Dos pasos en un mismo componente (no se remonta entre ellos, a
+// diferencia de Entrar/Registro/Reset): primero el correo, después el
+// código + contraseña nueva en un solo formulario. Mismo patrón de OTP de
+// 6 dígitos que el registro (plantilla "Reset password" en
+// frontend/email-templates/), nunca un link mágico.
+function ResetPasswordForm({
+  onVolver,
+  onDirtyChange,
+}: {
+  onVolver: () => void;
+  onDirtyChange: (dirty: boolean) => void;
+}) {
+  const { solicitarResetPassword, confirmarResetPassword } = useAuth();
+  const [paso, setPaso] = useState<'correo' | 'codigo'>('correo');
+  const [correo, setCorreo] = useState('');
+  const [codigo, setCodigo] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmarPassword, setConfirmarPassword] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onDirtyChange(correo.length > 0 || codigo.length > 0 || password.length > 0);
+    return () => onDirtyChange(false);
+  }, [correo, codigo, password, onDirtyChange]);
+
+  async function handleSubmitCorreo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+    setEnviando(true);
+    const { error: err } = await solicitarResetPassword(correo);
+    setEnviando(false);
+    if (err) setError(err);
+    else setPaso('codigo');
+  }
+
+  async function handleSubmitCodigo(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setError(null);
+
+    if (password !== confirmarPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    setEnviando(true);
+    const { error: err } = await confirmarResetPassword(correo, codigo.trim(), password);
+    setEnviando(false);
+    // Éxito: confirmarResetPassword ya deja la sesión activa,
+    // onAuthStateChange la recoge sola y el modal se desmonta.
+    if (err) setError(err);
+  }
+
+  if (paso === 'correo') {
+    return (
+      <form onSubmit={handleSubmitCorreo} className="anim-fade mt-8 text-center">
+        <h2 id="auth-modal-title" className="font-serif italic text-[28px] leading-[1.1] text-ink">
+          Vuelve a marcar tu clave
+        </h2>
+        <p className="mt-1.5 font-mono text-[9px] tracking-[0.2em] uppercase text-dim">Estudio ink·sai</p>
+        <p className="mt-6 font-body text-[15px] leading-snug text-[#4A4030]">
+          Escribe tu correo y te enviamos un código para elegir una contraseña nueva.
+        </p>
+
+        <Field
+          label="Correo"
+          type="email"
+          placeholder="tu@correo.com"
+          required
+          autoComplete="email"
+          value={correo}
+          onChange={(e) => setCorreo(e.target.value)}
+        />
+
+        {error && <Aviso>{error}</Aviso>}
+
+        <button
+          type="submit"
+          disabled={enviando}
+          className="mt-7 w-full bg-ink py-3.5 font-mono text-[10.5px] tracking-[0.22em] uppercase text-paper transition-opacity hover:opacity-85 disabled:opacity-40"
+        >
+          {enviando ? 'Enviando…' : 'Enviar código'}
+        </button>
+
+        <p className="mt-9 border-t border-[#DED7CB] pt-6 font-body text-sm text-[#7A7268]">
+          <button type="button" onClick={onVolver} className="border-b border-ink text-ink">
+            Volver a entrar
+          </button>
+        </p>
+      </form>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmitCodigo} className="anim-fade mt-8 text-center">
+      <h2 id="auth-modal-title" className="font-serif italic text-[28px] leading-[1.1] text-ink">
+        Elige tu nueva clave
+      </h2>
+      <p className="mt-1.5 font-mono text-[9px] tracking-[0.2em] uppercase text-dim">
+        Falta tu confirmación
+      </p>
+      <p className="mt-6 font-body text-[15px] leading-snug text-[#4A4030]">
+        Enviamos un código a <span className="italic">{correo}</span>. Ingrésalo junto a tu nueva
+        contraseña.
+      </p>
+
+      <label className="mt-6 block">
+        <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-dim">Código</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          placeholder="000000"
+          required
+          maxLength={6}
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value.replace(/\D/g, ''))}
+          className="mt-2 block w-full border-0 border-b border-ink/20 bg-transparent pb-[9px] text-center font-mono text-2xl tracking-[0.5em] text-ink placeholder:text-[#B9AF9C] focus:border-ink focus:outline-none"
+        />
+      </label>
+
+      <PasswordField
+        label="Nueva contraseña"
+        placeholder="········"
+        required
+        minLength={8}
+        autoComplete="new-password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <PasswordField
+        label="Confirma la contraseña"
+        placeholder="········"
+        required
+        minLength={8}
+        autoComplete="new-password"
+        value={confirmarPassword}
+        onChange={(e) => setConfirmarPassword(e.target.value)}
+      />
+
+      {error && <Aviso>{error}</Aviso>}
+
+      <button
+        type="submit"
+        disabled={enviando || codigo.length !== 6}
+        className="mt-7 w-full bg-ink py-3.5 font-mono text-[10.5px] tracking-[0.22em] uppercase text-paper transition-opacity hover:opacity-85 disabled:opacity-40"
+      >
+        {enviando ? 'Guardando…' : 'Cambiar contraseña'}
+      </button>
+
+      <p className="mt-9 border-t border-[#DED7CB] pt-6 font-body text-sm text-[#7A7268]">
+        <button type="button" onClick={() => setPaso('correo')} className="border-b border-ink text-ink">
+          Pedir otro código
+        </button>
+      </p>
     </form>
   );
 }

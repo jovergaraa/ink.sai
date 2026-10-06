@@ -37,6 +37,19 @@ interface Bloqueo {
   motivo: string | null;
 }
 
+interface Servicio {
+  id: string;
+  tipo: string;
+  duracion_minutos: number;
+  precio: number;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  correo: string;
+}
+
 // Los mismos largos que ofrecen los servicios, para no tener que escribir
 // minutos a mano cada vez.
 const DURACIONES = [
@@ -171,6 +184,8 @@ const CLASES_LABEL = 'font-mono text-[9px] tracking-[0.22em] uppercase text-dim'
 export default function AdminHuecos() {
   const [huecos, setHuecos] = useState<Hueco[]>([]);
   const [bloqueos, setBloqueos] = useState<Bloqueo[]>([]);
+  const [servicios, setServicios] = useState<Servicio[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -184,6 +199,9 @@ export default function AdminHuecos() {
   const [modalBloqueoAbierto, setModalBloqueoAbierto] = useState(false);
   const [huecoDetalle, setHuecoDetalle] = useState<Hueco | null>(null);
   const [eliminandoReserva, setEliminandoReserva] = useState(false);
+  // Celda vacía (fecha + hora) donde se hizo click en "+" para agendar
+  // directo — null cuando el modal de agendar está cerrado.
+  const [celdaAgendar, setCeldaAgendar] = useState<{ fecha: string; hora: string } | null>(null);
 
   const [inicioSemana, setInicioSemana] = useState(() => lunesDeLaSemana(new Date()));
   // Mes que muestra el mini-calendario. Por defecto sigue a la semana
@@ -224,9 +242,15 @@ export default function AdminHuecos() {
         .gte('fecha', hoy)
         .order('fecha', { ascending: true })
         .order('hora_inicio', { ascending: true }),
-    ]).then(([resHuecos, resBloqueos]) => {
+      supabase
+        .from('services')
+        .select('id, tipo, duracion_minutos, precio')
+        .eq('activo', true)
+        .order('duracion_minutos', { ascending: true }),
+      supabase.from('usuarios').select('id, nombre, correo').order('nombre', { ascending: true }),
+    ]).then(([resHuecos, resBloqueos, resServicios, resClientes]) => {
       if (cancelado) return;
-      if (resHuecos.error || resBloqueos.error) {
+      if (resHuecos.error || resBloqueos.error || resServicios.error || resClientes.error) {
         setError('No pudimos cargar los horarios. Intenta recargar la página.');
       } else {
         // El `select()` con embeds no tiene tipos de BD generados que guíen
@@ -235,6 +259,8 @@ export default function AdminHuecos() {
         // un solo nivel llegan como objeto, no array), de ahí el `unknown`.
         setHuecos((resHuecos.data as unknown as Hueco[]) ?? []);
         setBloqueos((resBloqueos.data as Bloqueo[]) ?? []);
+        setServicios((resServicios.data as Servicio[]) ?? []);
+        setClientes((resClientes.data as Cliente[]) ?? []);
       }
       setLoading(false);
     });
@@ -315,6 +341,77 @@ export default function AdminHuecos() {
       rows.map((r) => (r.id === h.id ? { ...r, tomado: false, booking: [] } : r)),
     );
     setHuecoDetalle(null);
+  }
+
+  // Agenda directo: Simón elige una celda vacía y, a diferencia de "Publicar
+  // horario" (que solo abre el hueco para que alguien lo reserve después),
+  // acá se crea el hueco y la reserva en el mismo paso — ya con cliente y
+  // servicio elegidos, como si el cliente la hubiera pedido por teléfono.
+  async function crearReservaDirecta(datos: {
+    fecha: string;
+    hora: string;
+    duracion: number;
+    clienteId: string;
+    servicioId: string;
+    nota: string;
+  }) {
+    setError(null);
+
+    const { data: hueco, error: errHueco } = await supabase
+      .from('huecos')
+      .insert({ fecha: datos.fecha, hora: datos.hora, duracion_minutos: datos.duracion })
+      .select('id, fecha, hora, duracion_minutos, nota, tomado')
+      .single();
+
+    if (errHueco || !hueco) {
+      setError('No pudimos crear el horario. Revisa los datos e intenta de nuevo.');
+      return false;
+    }
+
+    const { data: booking, error: errBooking } = await supabase
+      .from('booking')
+      .insert({
+        cliente_id: datos.clienteId,
+        service_id: datos.servicioId,
+        fecha: datos.fecha,
+        hora: datos.hora,
+        hueco_id: hueco.id,
+        estado: 'confirmado',
+        comentario: datos.nota.trim() || null,
+      })
+      .select('id, estado, comentario')
+      .single();
+
+    if (errBooking || !booking) {
+      // El hueco ya se creó pero sin reserva — lo borramos para no dejar un
+      // horario libre huérfano que nadie pidió.
+      await supabase.from('huecos').delete().eq('id', hueco.id);
+      setError('No pudimos agendar la sesión. Revisa el cliente y el servicio e intenta de nuevo.');
+      return false;
+    }
+
+    const cliente = clientes.find((c) => c.id === datos.clienteId);
+    const servicio = servicios.find((s) => s.id === datos.servicioId);
+    const nuevo: Hueco = {
+      ...(hueco as Omit<Hueco, 'booking'>),
+      tomado: true,
+      booking: [
+        {
+          id: booking.id,
+          estado: booking.estado,
+          comentario: booking.comentario,
+          usuarios: cliente ? { nombre: cliente.nombre, correo: cliente.correo, telefono: null } : null,
+          services: servicio ? { tipo: servicio.tipo, precio: servicio.precio } : null,
+        },
+      ],
+    };
+    setHuecos((rows) =>
+      [...rows, nuevo].sort((a, b) =>
+        a.fecha === b.fecha ? a.hora.localeCompare(b.hora) : a.fecha.localeCompare(b.fecha),
+      ),
+    );
+    setCeldaAgendar(null);
+    return true;
   }
 
   async function crearBloqueo(datos: { fecha: string; horaInicio: string; horaFin: string; motivo: string }) {
@@ -696,6 +793,13 @@ export default function AdminHuecos() {
                   bloqueosPorFecha={bloqueosPorFecha}
                   onBorrar={borrar}
                   onVerDetalle={setHuecoDetalle}
+                  onAgendar={(fecha, hora) => {
+                    if (servicios.length === 0) {
+                      setError('No hay servicios activos. Crea uno en Servicios antes de agendar.');
+                      return;
+                    }
+                    setCeldaAgendar({ fecha, hora });
+                  }}
                 />
               ))}
 
@@ -755,6 +859,16 @@ export default function AdminHuecos() {
           eliminando={eliminandoReserva}
           onClose={() => setHuecoDetalle(null)}
           onEliminar={() => borrarReserva(huecoDetalle)}
+        />
+      )}
+
+      {celdaAgendar && servicios.length > 0 && (
+        <ModalAgendarDirecto
+          celda={celdaAgendar}
+          clientes={clientes}
+          servicios={servicios}
+          onClose={() => setCeldaAgendar(null)}
+          onCrear={crearReservaDirecta}
         />
       )}
     </AdminLayout>
@@ -1036,6 +1150,230 @@ function ModalBloqueo({
   );
 }
 
+// Modal para que Simón agende directo a un cliente en una celda vacía:
+// crea el hueco y la reserva en el mismo paso. Mismo patrón de overlay que
+// ModalBloqueo. El buscador de cliente es un autocompletar simple sobre la
+// lista ya cargada (no hay tantos clientes como para paginar o ir al server
+// por cada letra).
+function ModalAgendarDirecto({
+  celda,
+  clientes,
+  servicios,
+  onClose,
+  onCrear,
+}: {
+  celda: { fecha: string; hora: string };
+  clientes: Cliente[];
+  servicios: Servicio[];
+  onClose: () => void;
+  onCrear: (datos: {
+    fecha: string;
+    hora: string;
+    duracion: number;
+    clienteId: string;
+    servicioId: string;
+    nota: string;
+  }) => Promise<boolean>;
+}) {
+  const [busquedaCliente, setBusquedaCliente] = useState('');
+  const [clienteId, setClienteId] = useState<string | null>(null);
+  const [listaAbierta, setListaAbierta] = useState(false);
+  const [servicioId, setServicioId] = useState(servicios[0]?.id ?? '');
+  const [duracion, setDuracion] = useState(servicios[0]?.duracion_minutos ?? 120);
+  const [nota, setNota] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  const clienteElegido = clientes.find((c) => c.id === clienteId) ?? null;
+
+  // Sin texto: muestra los primeros clientes igual que con texto, para que
+  // la lista aparezca completa al hacer foco (no solo al empezar a tipear).
+  const resultados = clienteElegido
+    ? []
+    : clientes
+        .filter((c) => {
+          const q = busquedaCliente.trim().toLowerCase();
+          if (!q) return true;
+          return c.nombre.toLowerCase().includes(q) || c.correo.toLowerCase().includes(q);
+        })
+        .slice(0, 6);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    const overflowPrevio = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handler);
+      document.body.style.overflow = overflowPrevio;
+    };
+  }, [onClose]);
+
+  function elegirCliente(c: Cliente) {
+    setClienteId(c.id);
+    setBusquedaCliente(c.nombre);
+    setListaAbierta(false);
+  }
+
+  function elegirServicio(id: string) {
+    setServicioId(id);
+    const s = servicios.find((s) => s.id === id);
+    if (s) setDuracion(s.duracion_minutos);
+  }
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setErrorLocal(null);
+
+    if (!clienteId) {
+      setErrorLocal('Busca y selecciona un cliente de la lista.');
+      return;
+    }
+    if (!servicioId) {
+      setErrorLocal('Elige un servicio.');
+      return;
+    }
+
+    setEnviando(true);
+    const ok = await onCrear({ fecha: celda.fecha, hora: celda.hora, duracion, clienteId, servicioId, nota });
+    setEnviando(false);
+    if (ok) onClose();
+    else setErrorLocal('No pudimos agendar la sesión. Intenta de nuevo.');
+  }
+
+  return createPortal(
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-ink p-6 anim-fade"
+      style={{
+        backgroundImage:
+          'repeating-linear-gradient(135deg, rgba(242,238,231,0.04) 0 1px, transparent 1px 18px)',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-agendar-title"
+        className="w-full max-w-[420px] bg-paper px-9 py-10 anim-modal-in"
+      >
+        <span className="font-mono text-[9px] tracking-[0.22em] uppercase text-dim">
+          {fmtFechaCorta(celda.fecha)} · {celda.hora} hrs
+        </span>
+        <h2 id="modal-agendar-title" className="mt-1 font-serif italic text-2xl text-ink">
+          Agendar sesión
+        </h2>
+
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
+          <div className="relative">
+            <label className="block">
+              <span className={CLASES_LABEL}>Cliente</span>
+              <input
+                type="text"
+                required
+                placeholder="Buscar por nombre o correo…"
+                value={busquedaCliente}
+                onChange={(e) => {
+                  setBusquedaCliente(e.target.value);
+                  setClienteId(null);
+                  setListaAbierta(true);
+                }}
+                onFocus={() => setListaAbierta(true)}
+                onBlur={() => setTimeout(() => setListaAbierta(false), 150)}
+                className={`${CLASES_INPUT} mt-2 placeholder:text-[#B9AF9C]`}
+              />
+            </label>
+            {listaAbierta && resultados.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-paper border border-ink/15 shadow-[0_4px_16px_rgba(27,24,21,0.12)] z-10 max-h-[180px] overflow-y-auto">
+                {resultados.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => elegirCliente(c)}
+                    className="w-full text-left px-4 py-2.5 hover:bg-[#EDE7DD] transition-colors"
+                  >
+                    <span className="block font-body text-[14px] text-ink">{c.nombre}</span>
+                    <span className="block font-mono text-[10px] text-dim">{c.correo}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {listaAbierta && busquedaCliente.trim().length > 0 && resultados.length === 0 && !clienteElegido && (
+              <p className="mt-1.5 font-body italic text-[12.5px] text-dim">Sin resultados.</p>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="agendar-servicio" className={CLASES_LABEL}>Servicio</label>
+            <select
+              id="agendar-servicio"
+              required
+              value={servicioId}
+              onChange={(e) => elegirServicio(e.target.value)}
+              className={CLASES_INPUT}
+            >
+              {servicios.map((s) => (
+                <option key={s.id} value={s.id}>{s.tipo}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="agendar-duracion" className={CLASES_LABEL}>Duración</label>
+            <select
+              id="agendar-duracion"
+              value={duracion}
+              onChange={(e) => setDuracion(Number(e.target.value))}
+              className={CLASES_INPUT}
+            >
+              {DURACIONES.map((d) => (
+                <option key={d.min} value={d.min}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <label className="block">
+            <span className={CLASES_LABEL}>Notas (opcional)</span>
+            <input
+              type="text"
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Motivo, indicaciones…"
+              className={`${CLASES_INPUT} mt-2 placeholder:text-[#B9AF9C]`}
+            />
+          </label>
+
+          {errorLocal && (
+            <p role="alert" className="font-mono text-[11px] leading-relaxed border-l-2 border-ink pl-3">
+              {errorLocal}
+            </p>
+          )}
+
+          <div className="flex gap-3 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 font-mono text-[10px] tracking-[0.2em] uppercase border border-ink/25 text-ink py-3.5"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={enviando}
+              className="flex-1 font-mono bg-ink text-paper text-[10px] tracking-[0.2em] uppercase py-3.5 disabled:opacity-40"
+            >
+              {enviando ? 'Agendando…' : 'Agendar sesión'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // Panel lateral con el detalle de una reserva ("Solicitado"): cliente,
 // servicio y cobro. Mismo patrón de overlay + portal que ModalBloqueo, pero
 // anclado a la derecha en vez de centrado.
@@ -1202,6 +1540,7 @@ function ExpandedRow({
   bloqueosPorFecha,
   onBorrar,
   onVerDetalle,
+  onAgendar,
 }: {
   horaLabel: number;
   fechasISO: string[];
@@ -1209,6 +1548,7 @@ function ExpandedRow({
   bloqueosPorFecha: Record<string, Bloqueo[]>;
   onBorrar: (h: Hueco) => void;
   onVerDetalle: (h: Hueco) => void;
+  onAgendar: (fecha: string, hora: string) => void;
 }) {
   return (
     <>
@@ -1229,12 +1569,33 @@ function ExpandedRow({
         const bloqueosDelDia = bloqueosPorFecha[iso] ?? [];
         const bloqueoDeEstaCelda = bloqueoEnHora(bloqueosDelDia, horaLabel);
 
+        // Vacía: nada empieza acá, ningún hueco anterior se extiende sobre
+        // esta celda, y no está bloqueada — solo ahí tiene sentido ofrecer
+        // "agendar" (si hay algo dibujado encima, el click lo tapa).
+        const cubiertaPorHuecoAnterior = huecosDelDia.some((h) => {
+          const [hh, mm] = h.hora.split(':').map(Number);
+          const finMin = hh * 60 + mm + h.duracion_minutos;
+          return hh < horaLabel && finMin > horaLabel * 60;
+        });
+        const celdaVacia =
+          huecosQueEmpiezanAqui.length === 0 && !cubiertaPorHuecoAnterior && !bloqueoDeEstaCelda;
+
         return (
           <div
             key={iso}
-            className="relative border-r border-r-[#DED7C9] border-b border-b-[#ECE6D9]"
+            className="group/celda relative border-r border-r-[#DED7C9] border-b border-b-[#ECE6D9]"
             style={{ minHeight: ALTO_FILA }}
           >
+            {celdaVacia && (
+              <button
+                type="button"
+                onClick={() => onAgendar(iso, `${String(horaLabel).padStart(2, '0')}:00`)}
+                aria-label={`Agendar sesión el ${iso} a las ${String(horaLabel).padStart(2, '0')}:00`}
+                className="absolute inset-0.5 flex items-center justify-center opacity-0 group-hover/celda:opacity-100 hover:bg-[#EDE7DD] transition-opacity"
+              >
+                <span className="font-mono text-base text-dim leading-none">+</span>
+              </button>
+            )}
             {huecosQueEmpiezanAqui.map((h) => {
               const [, mm] = h.hora.split(':').map(Number);
               const alto = (h.duracion_minutos / 60) * ALTO_FILA - 4;

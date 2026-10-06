@@ -32,6 +32,8 @@ interface AuthContextValue {
   signIn: (correo: string, password: string) => Promise<ResultadoAuth>;
   signUp: (datos: DatosRegistro) => Promise<ResultadoRegistro>;
   verifyOtp: (correo: string, token: string) => Promise<ResultadoVerificacion>;
+  solicitarResetPassword: (correo: string) => Promise<ResultadoAuth>;
+  confirmarResetPassword: (correo: string, token: string, password: string) => Promise<ResultadoAuth>;
   signOut: () => Promise<void>;
 }
 
@@ -188,6 +190,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Éxito: verifyOtp ya deja la sesión activa, onAuthStateChange
         // la recoge solo — no hay nada más que hacer acá.
         return { error: error ? traducirError(error) : null };
+      },
+
+      async solicitarResetPassword(correo) {
+        const { error } = await supabase.auth.resetPasswordForEmail(correo);
+        // Igual que signUp: no delatamos si el correo existe o no, para no
+        // dar pie a enumeración de cuentas. Un error real (rate limit, etc.)
+        // sí se muestra.
+        return { error: error ? traducirError(error) : null };
+      },
+
+      async confirmarResetPassword(correo, token, password) {
+        const { error: errVerificar } = await supabase.auth.verifyOtp({
+          email: correo,
+          token,
+          type: 'recovery',
+        });
+        if (errVerificar) {
+          return { error: traducirError(errVerificar) };
+        }
+
+        // verifyOtp con type "recovery" ya deja una sesión activa (la misma
+        // que necesita updateUser para poder cambiar la contraseña).
+        const { error: errPassword } = await supabase.auth.updateUser({ password });
+        return { error: errPassword ? traducirError(errPassword) : null };
       },
 
       async signOut() {
